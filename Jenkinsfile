@@ -49,10 +49,9 @@ pipeline {
             }
         }
 
-        stage('Login to ECR & Push Image') {
+       stage('Login to ECR & Push Image') {
             steps {
-                script {
-                    echo "Logging in to AWS ECR..."
+                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
                     sh """
                         aws ecr get-login-password --region $AWS_REGION | \
                         docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
@@ -62,7 +61,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy to EKS') {
             steps {
                 script {
@@ -70,7 +68,7 @@ pipeline {
                     sh """
                         aws eks update-kubeconfig --region $AWS_REGION --name my-eks-cluster
                         kubectl set image deployment/my-app my-app=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG -n default
-                        kubectl rollout status deployment/my-app -n default
+                        kubectl rollout status deployment/my-app 
                     """
                 }
             }
