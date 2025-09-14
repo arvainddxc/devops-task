@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION     = "ap-southeast-1"        // your AWS region
         ECR_REPO       = "test-repo"             // your ECR repo name
-        IMAGE_TAG      = "latest"                // or use BUILD_NUMBER for versioning
+        IMAGE_TAG      = "v1"                // or use BUILD_NUMBER for versioning
         AWS_ACCOUNT_ID = "695466865413"          // your AWS account ID
     }
 
