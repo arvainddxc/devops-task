@@ -1,5 +1,5 @@
 DevOps Task – Node.js Application with CI/CD, Docker & Kubernetes
-📂 Repository Structure
+ Repository Structure
 ├── app.js                
 ├── package.json       
 ├── package-lock.json
@@ -10,7 +10,7 @@ DevOps Task – Node.js Application with CI/CD, Docker & Kubernetes
     ├── deployment.yaml   
     └── service.yaml      
 
-🚀 Prerequisites
+Prerequisites
 
 Node.js (for local testing)
 
@@ -18,4 +18,14 @@ Docker (for containerization)
 
 Jenkins (for CI/CD pipeline)
 
-Kubernetes Cluster (EKS)
+Kubernetes Cluster (EKS) deployed through laod balancer.
+
+challenges faced:
+1) create effective ci/cd declarative pipeline with many stages involved.
+2) got the challenge when integrating the setup with other tools like and docker and kubernetes like push the image to ecr and eks is to pull the image.
+3) challenges faced while creating iamrole with required policies.
+4) get the logs and metrics into cloudwatch.
+
+architecture:
+
+
