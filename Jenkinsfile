@@ -54,7 +54,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'aws-creds',
                                                   usernameVariable: 'AWS_ACCESS_KEY_ID',
                                                   passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh """
+                    sh '''
                         aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
                         aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
                         aws configure set default.region $AWS_REGION
@@ -63,7 +63,7 @@ pipeline {
                         docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                         
                         docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG
-                    """
+                    '''
                 }
             }
         }
@@ -74,28 +74,28 @@ pipeline {
                                                   usernameVariable: 'AWS_ACCESS_KEY_ID',
                                                   passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sshagent(['eks-ssh']) {
-                        sh """
-                            # Copy latest manifests from Jenkins workspace to jump host
-                            scp -o StrictHostKeyChecking=no -r k8s ubuntu@13.213.70.212:/home/ubuntu/devops-task/
+                        sh '''
+                            # Copy latest manifests to jump host
+                            scp -o StrictHostKeyChecking=no -r k8s ubuntu@13.213.70.212:/home/ubuntu/
 
-                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 '
-                              export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                              export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                              export AWS_DEFAULT_REGION=$AWS_REGION
+                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 << 'EOF'
+                                export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                                export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                                export AWS_DEFAULT_REGION=$AWS_REGION
 
-                              # ensure kubeconfig is set for EKS
-                              aws eks update-kubeconfig --region $AWS_REGION --name your-eks-cluster-name
+                                # configure kubeconfig for EKS
+                                aws eks update-kubeconfig --region $AWS_REGION --name my-cluster
 
-                              cd /home/ubuntu/devops-task/k8s
+                                cd /home/ubuntu/k8s
 
-                              # update image dynamically
-                              sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" deployment.yaml
+                                # update image dynamically
+                                sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" deployment.yaml
 
-                              kubectl apply -f deployment.yaml
-                              kubectl apply -f service.yaml
-                              kubectl rollout status deployment/my-app
-                            '
-                        """
+                                kubectl apply -f deployment.yaml
+                                kubectl apply -f service.yaml
+                                kubectl rollout status deployment/my-app
+                            EOF
+                        '''
                     }
                 }
             }
