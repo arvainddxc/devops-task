@@ -2,10 +2,12 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION     = "ap-southeast-1"        // your AWS region
-        ECR_REPO       = "test-repo"             // your ECR repo name
-        IMAGE_TAG      = "v1"                    // or use BUILD_NUMBER for versioning
-        AWS_ACCOUNT_ID = "695466865413"          // your AWS account ID
+        AWS_REGION     = "ap-southeast-1"        // AWS region
+        ECR_REPO       = "test-repo"             // ECR repo name
+        IMAGE_TAG      = "v1"                    // or use BUILD_NUMBER
+        AWS_ACCOUNT_ID = "695466865413"          // AWS account ID
+        EKS_CLUSTER    = "my-cluster"            // your EKS cluster name
+        APP_NAME       = "test-app"                // k8s Deployment name
     }
 
     stages {
@@ -75,25 +77,26 @@ pipeline {
                                                   passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sshagent(['eks-ssh']) {
                         sh '''
-                            # Copy latest manifests to jump host
-                            scp -o StrictHostKeyChecking=no -r k8s ubuntu@13.213.70.212:/home/ubuntu/
+                            # Copy manifests to jump host
+                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 "mkdir -p /home/ubuntu/k8s"
+                            scp -o StrictHostKeyChecking=no -r k8s/* ubuntu@13.213.70.212:/home/ubuntu/k8s/
 
-                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 << 'EOF'
+                            # Deploy inside jump host
+                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 <<EOF
                                 export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                                 export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                                 export AWS_DEFAULT_REGION=$AWS_REGION
 
-                                # configure kubeconfig for EKS
-                                aws eks update-kubeconfig --region $AWS_REGION --name my-cluster
+                                aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
 
                                 cd /home/ubuntu/k8s
 
-                                # update image dynamically
+                                # Update deployment image
                                 sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" deployment.yaml
 
                                 kubectl apply -f deployment.yaml
                                 kubectl apply -f service.yaml
-                                kubectl rollout status deployment/my-app
+                                kubectl rollout status deployment/$APP_NAME
                             EOF
                         '''
                     }
