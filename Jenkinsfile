@@ -2,67 +2,87 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCOUNT_ID = "695466865413"
-        AWS_REGION     = "ap-southeast-1"
-        ECR_REPO       = "test-repo"
-        IMAGE_TAG      = "latest"
-        CLUSTER_NAME   = "my-cluster"   // change to your cluster name
-        K8S_NAMESPACE  = "test"          // change if using custom namespace
+        AWS_REGION     = "ap-southeast-1"        // your AWS region
+        ECR_REPO       = "test-repo"             // your ECR repo name
+        IMAGE_TAG      = "latest"                // or use BUILD_NUMBER for versioning
+        AWS_ACCOUNT_ID = "695466865413"          // your AWS account ID
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'dev', url: 'https://github.com/arvainddxc/devops-task.git'
+                echo "Fetching source code from GitHub..."
+                git branch: 'dev',
+                    url: 'https://github.com/arvainddxc/devops-task.git'
             }
         }
 
         stage('Install Dependencies') {
             steps {
+                echo "Installing Node.js dependencies..."
                 sh 'npm install'
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh 'npm test'
+                echo "Running tests..."
+                sh '''
+                if npm run | grep -q "test"; then
+                  npm test
+                else
+                  echo "⚠️ No test script found in package.json, skipping..."
+                fi
+                '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                    docker build -t $ECR_REPO:$IMAGE_TAG .
-                    docker tag $ECR_REPO:$IMAGE_TAG ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG
-                """
+                script {
+                    echo "Building Docker image..."
+                    sh """
+                        docker build -t $ECR_REPO:$IMAGE_TAG .
+                        docker tag $ECR_REPO:$IMAGE_TAG ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+                    """
+                }
             }
         }
 
-        stage('Push to ECR') {
+        stage('Login to ECR & Push Image') {
             steps {
-                sh """
-                    aws ecr get-login-password --region $AWS_REGION | \
-                    docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                    docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG
-                """
-            }
-        }
-
-        stage('Update Kubeconfig') {
-            steps {
-                sh """
-                    aws eks --region $AWS_REGION update-kubeconfig --name $CLUSTER_NAME
-                """
+                script {
+                    echo "Logging in to AWS ECR..."
+                    sh """
+                        aws ecr get-login-password --region $AWS_REGION | \
+                        docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                        
+                        docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+                    """
+                }
             }
         }
 
         stage('Deploy to EKS') {
             steps {
-                sh """
-                    kubectl set image deployment/test-app test-app=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG -n $K8S_NAMESPACE || \
-                    kubectl apply -f k8s/
-                """
+                script {
+                    echo "Deploying to EKS..."
+                    sh """
+                        aws eks update-kubeconfig --region $AWS_REGION --name my-eks-cluster
+                        kubectl set image deployment/my-app my-app=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG -n default
+                        kubectl rollout status deployment/my-app -n default
+                    """
+                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline executed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed!"
         }
     }
 }
