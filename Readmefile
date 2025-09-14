@@ -1,0 +1,21 @@
+DevOps Task – Node.js Application with CI/CD, Docker & Kubernetes
+📂 Repository Structure
+├── app.js                
+├── package.json       
+├── package-lock.json
+├── Dockerfile            
+├── Jenkinsfile           
+├── README.md           
+└── k8s/
+    ├── deployment.yaml   
+    └── service.yaml      
+
+🚀 Prerequisites
+
+Node.js (for local testing)
+
+Docker (for containerization)
+
+Jenkins (for CI/CD pipeline)
+
+Kubernetes Cluster (EKS)
