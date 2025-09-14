@@ -8,6 +8,7 @@ pipeline {
         IMAGE_TAG      = "v1"
         EKS_CLUSTER    = "my-cluster"
         APP_NAME       = "test-app"
+        JUMP_HOST      = "13.213.70.212"   // easier to reuse
     }
 
     stages {
@@ -62,40 +63,40 @@ pipeline {
             }
         }
 
-        stage('Deploy to EKS') {
+        stage('Deploy to EKS via Jump Host') {
             steps {
                 sshagent(['eks-ssh']) {
                     sh """
                         echo "🚀 Connecting to Jump Host..."
-                        ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 "mkdir -p /home/ubuntu/k8s"
+                        ssh -o StrictHostKeyChecking=no ubuntu@$JUMP_HOST "mkdir -p /home/ubuntu/k8s"
 
                         echo "📂 Copying Kubernetes manifests..."
-                        scp -o StrictHostKeyChecking=no -r k8s/deployment.yaml k8s/service.yaml ubuntu@13.213.70.212:/home/ubuntu/k8s/
+                        scp -o StrictHostKeyChecking=no -r k8s/deployment.yaml k8s/service.yaml ubuntu@$JUMP_HOST:/home/ubuntu/k8s/
 
                         echo "⚡ Running deployment on Jump Host..."
-                        ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 << 'EOF'
+                        ssh -o StrictHostKeyChecking=no ubuntu@$JUMP_HOST bash -c "'
                             set -e
 
-                            echo "✅ Verifying AWS identity..."
+                            echo ✅ Verifying AWS identity...
                             aws sts get-caller-identity
 
-                            echo "✅ Updating kubeconfig for cluster: $EKS_CLUSTER..."
-                            aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+                            echo ✅ Updating kubeconfig for cluster: ${EKS_CLUSTER}...
+                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
                             cd /home/ubuntu/k8s
-                            echo "📝 Updating deployment.yaml with new image..."
-                            sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}|g" deployment.yaml
+                            echo 📝 Updating deployment.yaml with new image...
+                            sed -i \\"s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}|g\\" deployment.yaml
 
-                            echo "📦 Applying manifests..."
+                            echo 📦 Applying manifests...
                             kubectl apply -f deployment.yaml --validate=false
                             kubectl apply -f service.yaml --validate=false
 
-                            echo "⏳ Waiting for rollout..."
-                            kubectl rollout status deployment/$APP_NAME || true
+                            echo ⏳ Waiting for rollout...
+                            kubectl rollout status deployment/${APP_NAME} || true
 
-                            echo "✅ Checking pods..."
+                            echo ✅ Checking pods...
                             kubectl get pods -o wide
-                        EOF
+                        '"
                     """
                 }
             }
