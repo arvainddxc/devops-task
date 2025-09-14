@@ -75,12 +75,18 @@ pipeline {
                                                   passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sshagent(['eks-ssh']) {
                         sh """
+                            # Copy latest manifests from Jenkins workspace to jump host
+                            scp -o StrictHostKeyChecking=no -r k8s ubuntu@13.213.70.212:/home/ubuntu/devops-task/
+
                             ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 '
                               export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                               export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                               export AWS_DEFAULT_REGION=$AWS_REGION
 
-                              cd devops-task/k8s
+                              # ensure kubeconfig is set for EKS
+                              aws eks update-kubeconfig --region $AWS_REGION --name your-eks-cluster-name
+
+                              cd /home/ubuntu/devops-task/k8s
 
                               # update image dynamically
                               sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" deployment.yaml
