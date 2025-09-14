@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION     = "ap-southeast-1"        // your AWS region
         ECR_REPO       = "test-repo"             // your ECR repo name
-        IMAGE_TAG      = "v1"                // or use BUILD_NUMBER for versioning
+        IMAGE_TAG      = "v1"                    // or use BUILD_NUMBER for versioning
         AWS_ACCOUNT_ID = "695466865413"          // your AWS account ID
     }
 
@@ -49,10 +49,17 @@ pipeline {
             }
         }
 
-       stage('Login to ECR & Push Image') {
+        stage('Login to ECR & Push Image') {
             steps {
-                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
+                // Use AWS credentials stored in Jenkins
+                withCredentials([usernamePassword(credentialsId: 'aws-creds',
+                                                  usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                                  passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh """
+                        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                        aws configure set default.region $AWS_REGION
+                        
                         aws ecr get-login-password --region $AWS_REGION | \
                         docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                         
@@ -61,6 +68,7 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy to EKS') {
             steps {
                 script {
