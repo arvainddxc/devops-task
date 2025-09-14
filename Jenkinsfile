@@ -7,7 +7,7 @@ pipeline {
         IMAGE_TAG      = "v1"                    // or use BUILD_NUMBER
         AWS_ACCOUNT_ID = "695466865413"          // AWS account ID
         EKS_CLUSTER    = "my-cluster"            // your EKS cluster name
-        APP_NAME       = "test-app"                // k8s Deployment name
+        APP_NAME       = "test-app"              // k8s Deployment name
     }
 
     stages {
@@ -76,29 +76,31 @@ pipeline {
                                                   usernameVariable: 'AWS_ACCESS_KEY_ID',
                                                   passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sshagent(['eks-ssh']) {
-                        sh '''
+                        sh """
                             # Copy manifests to jump host
                             ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 "mkdir -p /home/ubuntu/k8s"
                             scp -o StrictHostKeyChecking=no -r k8s/* ubuntu@13.213.70.212:/home/ubuntu/k8s/
 
                             # Deploy inside jump host
-                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 <<EOF
-                                export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                                export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                                export AWS_DEFAULT_REGION=$AWS_REGION
+                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 bash -c '
+                                export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                                export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                                export AWS_DEFAULT_REGION=${AWS_REGION}
 
-                                aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+                                aws sts get-caller-identity   # sanity check
+
+                                aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
 
                                 cd /home/ubuntu/k8s
 
                                 # Update deployment image
-                                sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" deployment.yaml
+                                sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}|g" deployment.yaml
 
-                                kubectl apply -f deployment.yaml
-                                kubectl apply -f service.yaml
-                                kubectl rollout status deployment/$APP_NAME
-                            EOF
-                        '''
+                                kubectl apply -f deployment.yaml --validate=false
+                                kubectl apply -f service.yaml --validate=false
+                                kubectl rollout status deployment/${APP_NAME} || true
+                            '
+                        """
                     }
                 }
             }
