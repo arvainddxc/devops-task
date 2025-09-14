@@ -72,13 +72,15 @@ pipeline {
             steps {
                 script {
                     echo "Deploying to EKS via remote VM..."
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 '
-                          aws eks update-kubeconfig --region $AWS_REGION --name my-cluster
-                          kubectl set image deployment/my-app my-app=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG 
-                          kubectl rollout status deployment/my-app
-                        '
-                    """
+                    sshagent(['eks-ssh']) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ubuntu@13.213.70.212 '
+                              aws eks update-kubeconfig --region $AWS_REGION --name my-cluster
+                              kubectl set image deployment/my-app my-app=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG 
+                              kubectl rollout status deployment/my-app
+                            '
+                        """
+                    }
                 }
             }
         }
