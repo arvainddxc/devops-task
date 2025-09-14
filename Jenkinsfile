@@ -74,7 +74,7 @@ pipeline {
                 script {
                     echo "Deploying to EKS..."
                     sh """
-                        aws eks update-kubeconfig --region $AWS_REGION --name my-eks-cluster
+                        aws eks update-kubeconfig --region $AWS_REGION --name my-cluster
                         kubectl set image deployment/my-app my-app=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG -n default
                         kubectl rollout status deployment/my-app 
                     """
