@@ -80,13 +80,13 @@ pipeline {
                               export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                               export AWS_DEFAULT_REGION=$AWS_REGION
 
-                              aws eks update-kubeconfig --region $AWS_REGION --name my-cluster
+                              cd devops-task/k8s
 
-                              # Update image dynamically in the manifest (optional)
-                              sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" k8s/deployment.yaml
+                              # update image dynamically
+                              sed -i "s|image:.*|image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPO:$IMAGE_TAG|g" deployment.yaml
 
-                              kubectl apply -f k8s/deployment.yaml
-                              kubectl apply -f k8s/service.yaml
+                              kubectl apply -f deployment.yaml
+                              kubectl apply -f service.yaml
                               kubectl rollout status deployment/my-app
                             '
                         """
